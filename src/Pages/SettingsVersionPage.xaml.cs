@@ -62,8 +62,6 @@ public partial class SettingsVersionPage : Page
         var window = (MainWindow)Application.Current.MainWindow;
         window.LaunchButton.IsEnabledChanged -= LaunchButtonIsEnabledChanged;
 
-        var settingsPage = (SettingsPage)window.SettingsFrame.Content;
-        settingsPage.VersionsPageButton.IsEnabled = true;
     }
 
     public SettingsVersionPage()

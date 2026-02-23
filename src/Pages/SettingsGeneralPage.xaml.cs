@@ -163,6 +163,11 @@ public partial class SettingsGeneralPage : Page
 
         WaitForInitialization.IsChecked = _settings.WaitForInitialization;
         DLLTextBox.Value = _settings.CustomDllPath;
+        CustomTargetInjection.IsChecked = _settings.CustomTargetInjection;
+        CustomTargetTextBox.Text = _settings.CustomTargetProcessName;
+
+        if (_settings.CustomTargetInjection)
+            Animations.ToggleButtonTransitions.CheckedAnimation(CustomTargetGrid);
 
 
         var window = (MainWindow)Application.Current.MainWindow;
@@ -174,6 +179,24 @@ public partial class SettingsGeneralPage : Page
         var button = (ToggleButton)sender;
         if (button.IsChecked is not bool @checked) return;
         _settings.WaitForInitialization = @checked;
+    }
+
+    void CustomTargetInjection_Click(object sender, RoutedEventArgs args)
+    {
+        var button = (ToggleButton)sender;
+        if (button.IsChecked is not bool @checked) return;
+
+        _settings.CustomTargetInjection = @checked;
+
+        if (@checked)
+            Animations.ToggleButtonTransitions.CheckedAnimation(CustomTargetGrid);
+        else
+            Animations.ToggleButtonTransitions.UnCheckedAnimation(CustomTargetGrid);
+    }
+
+    void CustomTargetTextBox_OnTextChanged(object sender, TextChangedEventArgs args)
+    {
+        _settings.CustomTargetProcessName = CustomTargetTextBox.Text;
     }
 
     void HardwareAcceleration_Click(object sender, RoutedEventArgs e)

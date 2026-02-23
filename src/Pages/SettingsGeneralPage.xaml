@@ -85,6 +85,19 @@
                 <styles:TextBox x:Name="DLLTextBox"/>
             </Grid>
 
+            <ToggleButton Click="CustomTargetInjection_Click" Name="CustomTargetInjection" Content="Custom Target Injection" Style="{StaticResource ToggleButton}"/>
+            <Grid Height="0" Name="CustomTargetGrid">
+                <Grid Height="30" Width="515" Margin="0,2.5,0,2.5">
+                    <Grid.Background>
+                        <SolidColorBrush Color="#151515"/>
+                    </Grid.Background>
+                    <Grid.Clip>
+                        <RectangleGeometry Rect="0,0,515,30" RadiusX="10" RadiusY="10"/>
+                    </Grid.Clip>
+                    <TextBox Name="CustomTargetTextBox" BorderThickness="0" Background="Transparent" Foreground="White" CaretBrush="White" FontSize="14" FontFamily="pack://application:,,,/Assets/#Space Grotesk" Margin="8,0,8,0" VerticalContentAlignment="Center" TextChanged="CustomTargetTextBox_OnTextChanged" ToolTip="Target process name or exe, e.g. notepad or notepad.exe"/>
+                </Grid>
+            </Grid>
+
             <ToggleButton Click="WaitForInitializationClick" Name="WaitForInitialization" Content="Wait For Initialization" Style="{StaticResource ToggleButton}"/>
             <Button Margin="3.125,0,0,0" Name="ClientFolderButton" Cursor="Hand" Template="{StaticResource LaunchButtonTemplate}"/>
          

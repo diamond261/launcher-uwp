@@ -166,7 +166,7 @@ public partial class MainWindow
         try
         {
             VersionLabel.Text = $"{(Minecraft.UsingGameDevelopmentKit ? "GDK" : "UWP")} ~ {Minecraft.Version}";
-            VersionTextBorder.Background = VersionCatalog.IsCompatible ? _darkGreen : _darkRed;
+            VersionTextBorder.Background = _darkGreen;
         }
         catch
         {
@@ -179,24 +179,10 @@ public partial class MainWindow
     {
         base.OnSourceInitialized(e);
 
-        _ = Task.WhenAll(CheckLicenseAsync(), SetCampaignBannerAsync());
+        _ = CheckLicenseAsync();
         CreateMessageBox("📢 Join our Discord! https://flarial.xyz/discord");
 
         if (!_settings.HardwareAcceleration) CreateMessageBox("⚠️ Hardware acceleration is disabled.");
-    }
-
-    async Task SetCampaignBannerAsync()
-    {
-        try
-        {
-            var imageSource = await Sponsors.GetLiteByteCampaignBannerAsync();
-            if (imageSource is not null) AdBorder.Background = new ImageBrush()
-            {
-                ImageSource = imageSource,
-                Stretch = Stretch.UniformToFill
-            };
-        }
-        catch { }
     }
 
     static readonly SolidColorBrush _darkRed = new(Colors.DarkRed);
@@ -213,38 +199,7 @@ public partial class MainWindow
 
     private async void MainWindow_ContentRendered(object sender, EventArgs e)
     {
-        if (!await HttpService.IsAvailableAsync() && await DialogBox.ShowAsync("🚨 Connection Failure", @"Failed to connect to Flarial's CDN.
-        
-• Try restarting the launcher.
-• Check your internet connection.
-• Change your system DNS for both IPv4 and IPv6.
-
-If you need help, join our Discord.", ("Exit", true), ("Continue", false))) { Close(); return; }
-
-        if (await LauncherUpdater.CheckAsync() && await DialogBox.ShowAsync("💡 Launcher Update", @"An update is available for the launcher.
-
-• Updating the launcher provides new bug fixes & features.
-• Newer versions of the client & game might require a launcher update.
-
-If you need help, join our Discord.", ("Update", true), ("Later", false)))
-        {
-            updateTextEnabled = true;
-
-            Dispatcher.Invoke(() =>
-            {
-                MainGrid.IsEnabled = false;
-                MainGrid.Visibility = Visibility.Hidden;
-                mbGrid.Visibility = Visibility.Hidden;
-                LolGrid.Visibility = Visibility.Visible;
-                LolGrid.IsEnabled = true;
-            });
-
-            await LauncherUpdater.DownloadAsync(LauncherDownloadProgressAction);
-            return;
-        }
-
         _launchButtonTextBlock.Text = "Preparing...";
-        VersionCatalog = await Catalog.GetAsync();
 
         PackageCatalog.PackageInstalling += (_, args) => { if (args.IsComplete) UpdateGameVersionText(args.Package); };
         PackageCatalog.PackageUninstalling += (_, args) => { if (args.IsComplete) UpdateGameVersionText(args.Package); };
@@ -301,6 +256,8 @@ If you need help, join our Discord.", ("Update", true), ("Later", false)))
             var path = _settings.CustomDllPath;
             var custom = build is DllBuild.Custom;
             var initialized = _settings.WaitForInitialization;
+            var customTargetInjection = _settings.CustomTargetInjection;
+            var customTargetProcessName = _settings.CustomTargetProcessName;
             var beta = build is DllBuild.Beta or DllBuild.Nightly || Minecraft.UsingGameDevelopmentKit;
             var client = beta ? FlarialClient.Beta : FlarialClient.Release;
 
@@ -321,21 +278,22 @@ If you need help, join our Discord.", ("Update", true), ("Later", false)))
                 }
 
                 _launchButtonTextBlock.Text = "Launching...";
-                if (await Task.Run(() => Injector.Launch(initialized, library)) is not { })
-                    CreateMessageBox("💡 Please close the game & try again.");
+                var processId = customTargetInjection
+                    ? await Task.Run(() => Injector.Launch(library, customTargetProcessName))
+                    : await Task.Run(() => Injector.Launch(initialized, library));
 
-                StatusLabel.Text = "Launched Custom DLL.";
-                return;
-            }
+                if (processId is not { })
+                {
+                    if (customTargetInjection)
+                        CreateMessageBox($"💡 Please start '{customTargetProcessName}' and try again.");
+                    else
+                        CreateMessageBox("💡 Please close the game & try again.");
+                    return;
+                }
 
-            if (!beta && !VersionCatalog.IsCompatible)
-            {
-                await DialogBox.ShowAsync("⚠️ Unsupported Version", @"The currently installed version is unsupported by the client.
-
-• Try switching to a version supported by the client.
-• Try using the beta build of client via [Settings] -> [General].
-
-If you need help, join our Discord.", ("OK", true));
+                StatusLabel.Text = customTargetInjection
+                    ? $"Launched Custom DLL into {customTargetProcessName}."
+                    : "Launched Custom DLL.";
                 return;
             }
 
@@ -382,9 +340,6 @@ If you need help, join our Discord.", ("OK", true));
         _launchButtonTextBlock.Text = "Downloading...";
         statusLabel.Text = $"Downloading... {value}%";
     });
-
-    void LauncherDownloadProgressAction(int value) => Dispatcher.Invoke(() => { updateProgress = value; });
-
     private void Window_OnClosing(object sender, CancelEventArgs e)
     {
         if (isDownloadingVersion)
@@ -401,14 +356,4 @@ If you need help, join our Discord.", ("OK", true));
         Environment.Exit(0);
     }
 
-    static readonly ProcessStartInfo _startInfo = new()
-    {
-        UseShellExecute = true,
-        FileName = Sponsors.LiteByteCampaignUri
-    };
-
-    private void AdBorder_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        using (Process.Start(_startInfo)) { }
-    }
 }

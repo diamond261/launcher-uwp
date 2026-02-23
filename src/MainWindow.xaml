@@ -158,7 +158,6 @@
                             </Grid>
                         </Grid>
                     </Border>
-                    <Border MouseLeftButtonDown="AdBorder_OnMouseLeftButtonDown" Cursor="Hand" Name="AdBorder" Height="50" Width="320" CornerRadius="10" Margin="0,12.5,0,20" VerticalAlignment="Top" HorizontalAlignment="Center"/>
                 </Grid>
             </Border>
             <Border Width="0" Name="NewsBorder" Grid.Column="1" Background="#201A1B" CornerRadius="25">
