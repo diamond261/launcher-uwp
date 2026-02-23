@@ -160,6 +160,8 @@ public partial class SettingsGeneralPage : Page
 
         AutoLogin.IsChecked = _settings.AutoLogin;
         HardwareAcceleration.IsChecked = _settings.HardwareAcceleration;
+        SaveOnTray.IsChecked = _settings.SaveOnTray;
+        AutoInject.IsChecked = _settings.AutoInject;
 
         WaitForInitialization.IsChecked = _settings.WaitForInitialization;
         DLLTextBox.Value = _settings.CustomDllPath;
@@ -208,6 +210,28 @@ public partial class SettingsGeneralPage : Page
             return;
 
         settings.HardwareAcceleration = @checked;
+    }
+
+    void SaveOnTray_Click(object sender, RoutedEventArgs e)
+    {
+        var settings = Settings.Current;
+        var button = (ToggleButton)sender;
+
+        if (button.IsChecked is not bool @checked)
+            return;
+
+        settings.SaveOnTray = @checked;
+    }
+
+    void AutoInject_Click(object sender, RoutedEventArgs e)
+    {
+        var settings = Settings.Current;
+        var button = (ToggleButton)sender;
+
+        if (button.IsChecked is not bool @checked)
+            return;
+
+        settings.AutoInject = @checked;
     }
 
     private void ToggleButton_Click_1(object sender, RoutedEventArgs e)

@@ -45,6 +45,12 @@ sealed partial class Settings
     [DataMember]
     internal string CustomTargetProcessName = "Minecraft.Windows.exe";
 
+    [DataMember]
+    internal bool SaveOnTray;
+
+    [DataMember]
+    internal bool AutoInject;
+
     internal bool AutoLogin = true;
 }
 
@@ -58,6 +64,8 @@ partial class Settings
         WaitForInitialization = true;
         CustomTargetInjection = false;
         CustomTargetProcessName = "Minecraft.Windows.exe";
+        SaveOnTray = false;
+        AutoInject = false;
 
         AutoLogin = true;
         HardwareAcceleration = true;

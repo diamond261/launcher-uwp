@@ -13,6 +13,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Interop;
+using Drawing = System.Drawing;
+using Forms = System.Windows.Forms;
 using Windows.ApplicationModel;
 using static System.StringComparison;
 using Flarial.Launcher.Services.Client;
@@ -83,11 +85,19 @@ public partial class MainWindow
 
     readonly TextBlock _launchButtonTextBlock;
 
+    readonly Forms.NotifyIcon _trayIcon;
+
+    bool _exitRequested;
+
+    bool _autoInjected;
+
     readonly Settings _settings = Settings.Current;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        _trayIcon = InitializeTrayIcon();
 
         LaunchButton.ApplyTemplate();
         _launchButtonTextBlock = (TextBlock)LaunchButton.Template.FindName("LaunchText", LaunchButton);
@@ -141,6 +151,50 @@ public partial class MainWindow
         IsLaunchEnabled = false;
 
         StartRefreshTimer();
+    }
+
+    Forms.NotifyIcon InitializeTrayIcon()
+    {
+        Forms.NotifyIcon trayIcon = new()
+        {
+            Text = "Flarial Launcher",
+            Visible = false
+        };
+
+        var icon = Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
+        if (icon is not null)
+            trayIcon.Icon = icon;
+
+        Forms.ContextMenuStrip menu = new();
+        menu.Items.Add("Open", null, (_, _) => ShowFromTray());
+        menu.Items.Add("Exit", null, (_, _) => ExitFromTray());
+
+        trayIcon.ContextMenuStrip = menu;
+        trayIcon.DoubleClick += (_, _) => ShowFromTray();
+
+        return trayIcon;
+    }
+
+    void ShowFromTray()
+    {
+        ShowInTaskbar = true;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    void ExitFromTray()
+    {
+        _exitRequested = true;
+        _trayIcon.Visible = false;
+        Close();
+    }
+
+    void MinimizeToTray()
+    {
+        _trayIcon.Visible = true;
+        ShowInTaskbar = false;
+        Hide();
     }
 
     private System.Timers.Timer refreshTimer;
@@ -208,6 +262,12 @@ public partial class MainWindow
         UpdateGameVersionText();
         _launchButtonTextBlock.Text = "Launch";
         IsLaunchEnabled = true;
+
+        if (_settings.AutoInject && !_autoInjected)
+        {
+            _autoInjected = true;
+            await LaunchClientAsync();
+        }
     }
 
     public static void CreateMessageBox(string text)
@@ -217,7 +277,16 @@ public partial class MainWindow
 
     private void MoveWindow(object sender, MouseButtonEventArgs e) => DragMove();
 
-    private void WindowMinimize(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void WindowMinimize(object sender, RoutedEventArgs e)
+    {
+        if (_settings.SaveOnTray)
+        {
+            MinimizeToTray();
+            return;
+        }
+
+        WindowState = WindowState.Minimized;
+    }
 
     private void WindowClose(object sender, RoutedEventArgs e) => Close();
 
@@ -240,6 +309,9 @@ public partial class MainWindow
     }
 
     private async void Inject_Click(object sender, RoutedEventArgs e)
+        => await LaunchClientAsync();
+
+    async Task LaunchClientAsync()
     {
         try
         {
@@ -342,6 +414,13 @@ If you need help, join our Discord.", ("OK", true));
     });
     private void Window_OnClosing(object sender, CancelEventArgs e)
     {
+        if (_settings.SaveOnTray && !_exitRequested)
+        {
+            e.Cancel = true;
+            MinimizeToTray();
+            return;
+        }
+
         if (isDownloadingVersion)
         {
             e.Cancel = true;
@@ -352,6 +431,8 @@ If you need help, join our Discord.", ("OK", true));
     protected override void OnClosed(EventArgs args)
     {
         base.OnClosed(args);
+        _trayIcon.Visible = false;
+        _trayIcon.Dispose();
         Settings.Current.Save();
         Environment.Exit(0);
     }
