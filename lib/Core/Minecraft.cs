@@ -52,6 +52,8 @@ public unsafe abstract class Minecraft
         }
     }
 
+    public static uint? RunningProcessId => Current.Window is { } window ? window.ProcessId : null;
+
     private protected NativeWindow? Window
     {
         get

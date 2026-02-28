@@ -40,7 +40,12 @@ unsafe sealed class MinecraftUWP : Minecraft
 
     public override uint? Launch(bool initialized)
     {
-        if (IsRunning) return Activate();
+        if (Window is { } window)
+        {
+            window.Switch();
+            return window.ProcessId;
+        }
+
         var parent = CreateForPackageFamily(PackageFamilyName).LocalFolder.Path;
         var child = initialized ? @"games\com.mojang\minecraftpe\resource_init_lock" : @"games\com.mojang\minecraftpe\menu_load_lock";
 

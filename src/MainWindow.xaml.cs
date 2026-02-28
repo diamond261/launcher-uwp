@@ -4,7 +4,8 @@ using Flarial.Launcher.Pages;
 using Flarial.Launcher.Animations;
 using System;
 using System.ComponentModel;
-using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
@@ -29,15 +30,7 @@ namespace Flarial.Launcher;
 
 public partial class MainWindow
 {
-    public int version = 200;
-
-    public static int progressPercentage;
-
-    public static long progressBytesReceived, progressBytesTotal;
-
-    public static string progressType;
-
-    public static bool isPremium, isLoggedIn, Reverse, isDownloadingVersion;
+    public static bool Reverse, isDownloadingVersion;
 
     public static ImageBrush PFP;
 
@@ -47,11 +40,7 @@ public partial class MainWindow
 
     private static StackPanel mbGrid;
 
-    private static readonly Stopwatch speed = new();
-
     internal readonly WindowInteropHelper WindowInteropHelper;
-
-    public static Catalog VersionCatalog;
 
     public bool IsLaunchEnabled
     {
@@ -63,33 +52,17 @@ public partial class MainWindow
         DependencyProperty.Register("IsLaunchEnabled", typeof(bool),
             typeof(MainWindow), new PropertyMetadata(true));
 
-    public bool updateTextEnabled
-    {
-        get { return (bool)GetValue(updateTextEnabledProperty); }
-        set { SetValue(updateTextEnabledProperty, value); }
-    }
-
-    public static readonly DependencyProperty updateTextEnabledProperty =
-        DependencyProperty.Register("updateTextEnabled", typeof(bool),
-            typeof(MainWindow), new PropertyMetadata(true));
-
-    public int updateProgress
-    {
-        get { return (int)GetValue(updateProgressProperty); }
-        set { SetValue(updateProgressProperty, value); }
-    }
-
-    public static readonly DependencyProperty updateProgressProperty =
-        DependencyProperty.Register("updateProgress", typeof(int),
-            typeof(MainWindow), new PropertyMetadata(0));
-
     readonly TextBlock _launchButtonTextBlock;
 
     readonly Forms.NotifyIcon _trayIcon;
 
     bool _exitRequested;
 
-    bool _autoInjected;
+    bool _autoVoidDisabled;
+
+    internal bool IsAutoVoidDisabled => _autoVoidDisabled;
+
+    readonly MediaPlayer _startupSoundPlayer = new();
 
     readonly Settings _settings = Settings.Current;
 
@@ -112,22 +85,12 @@ public partial class MainWindow
         MouseLeftButtonDown += (_, _) => { try { DragMove(); } catch { } };
         ContentRendered += MainWindow_ContentRendered;
 
-        Stopwatch stopwatch = new();
-        speed.Start();
-        stopwatch.Start();
-
-        Trace.WriteLine("Debug 0 " + stopwatch.Elapsed.Milliseconds.ToString());
-
-        Trace.WriteLine("Debug 0.5 " + stopwatch.Elapsed.Milliseconds.ToString());
-
-        Trace.WriteLine("Debug 1 " + stopwatch.Elapsed.Milliseconds.ToString());
-
-        LauncherVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version;
-
-        Trace.WriteLine("Debug 2 " + stopwatch.Elapsed.Milliseconds.ToString());
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        LauncherVersion.Text = version is null
+            ? "v0.0.0"
+            : $"v{version.Major}.{version.Minor}.{version.Build}";
 
         Dispatcher.InvokeAsync(MinecraftGame.Init);
-        Trace.WriteLine("Debug 3 " + stopwatch.Elapsed.Milliseconds.ToString());
 
         StatusLabel = statusLabel;
         versionLabel = VersionLabel;
@@ -139,18 +102,11 @@ public partial class MainWindow
         SettingsPage.b1 = MainBorder;
 
         Dispatcher.InvokeAsync(RPCManager.Initialize);
-
-        Trace.WriteLine("Debug 9 " + stopwatch.Elapsed.Milliseconds.ToString());
         Application.Current.MainWindow = this;
 
         SetGreetingLabel();
-        Trace.WriteLine("Debug 10 " + stopwatch.Elapsed.Milliseconds.ToString());
-
-        stopwatch.Stop();
 
         IsLaunchEnabled = false;
-
-        StartRefreshTimer();
     }
 
     Forms.NotifyIcon InitializeTrayIcon()
@@ -197,20 +153,6 @@ public partial class MainWindow
         Hide();
     }
 
-    private System.Timers.Timer refreshTimer;
-
-    private void StartRefreshTimer()
-    {
-        refreshTimer = new System.Timers.Timer(1.5 * 60 * 1000);
-        refreshTimer.Elapsed += (sender, e) => RefreshWebView();
-        refreshTimer.AutoReset = true;
-        refreshTimer.Enabled = true;
-    }
-
-    private void RefreshWebView()
-    {
-    }
-
     readonly PackageCatalog PackageCatalog = PackageCatalog.OpenForCurrentUser();
 
     void UpdateGameVersionText(Package package) { if (package.Id.FamilyName.Equals("Microsoft.MinecraftUWP_8wekyb3d8bbwe", OrdinalIgnoreCase)) UpdateGameVersionText(); }
@@ -219,13 +161,11 @@ public partial class MainWindow
     {
         try
         {
-            VersionLabel.Text = $"{(Minecraft.UsingGameDevelopmentKit ? "GDK" : "UWP")} ~ {Minecraft.Version}";
-            VersionTextBorder.Background = _darkGreen;
+            VersionLabel.Text = $"{Minecraft.Version} ({(Minecraft.UsingGameDevelopmentKit ? "GDK" : "UWP")})";
         }
         catch
         {
-            VersionLabel.Text = "? ~ 0.0.0";
-            VersionTextBorder.Background = _darkGoldenrod;
+            VersionLabel.Text = "0.0.0 (UWP)";
         }
     });
 
@@ -253,6 +193,8 @@ public partial class MainWindow
 
     private async void MainWindow_ContentRendered(object sender, EventArgs e)
     {
+        PlayStartupSound();
+
         _launchButtonTextBlock.Text = "Preparing...";
 
         PackageCatalog.PackageInstalling += (_, args) => { if (args.IsComplete) UpdateGameVersionText(args.Package); };
@@ -263,11 +205,6 @@ public partial class MainWindow
         _launchButtonTextBlock.Text = "Launch";
         IsLaunchEnabled = true;
 
-        if (_settings.AutoInject && !_autoInjected)
-        {
-            _autoInjected = true;
-            await LaunchClientAsync();
-        }
     }
 
     public static void CreateMessageBox(string text)
@@ -309,9 +246,9 @@ public partial class MainWindow
     }
 
     private async void Inject_Click(object sender, RoutedEventArgs e)
-        => await LaunchClientAsync();
+        => await LaunchClientAsync(false);
 
-    async Task LaunchClientAsync()
+    async Task<bool> LaunchClientAsync(bool silentFailures)
     {
         try
         {
@@ -320,8 +257,9 @@ public partial class MainWindow
 
             if (!Minecraft.IsInstalled)
             {
-                CreateMessageBox(@"⚠️ Please install the game.");
-                return;
+                if (!silentFailures)
+                    CreateMessageBox(@"⚠️ Please install the game.");
+                return false;
             }
 
             var build = _settings.DllBuild;
@@ -330,74 +268,132 @@ public partial class MainWindow
             var initialized = _settings.WaitForInitialization;
             var customTargetInjection = _settings.CustomTargetInjection;
             var customTargetProcessName = _settings.CustomTargetProcessName;
-            var beta = build is DllBuild.Beta or DllBuild.Nightly || Minecraft.UsingGameDevelopmentKit;
+            var beta = build is DllBuild.Beta or DllBuild.Nightly;
             var client = beta ? FlarialClient.Beta : FlarialClient.Release;
 
             if (custom)
             {
                 if (string.IsNullOrWhiteSpace(path))
                 {
-                    CreateMessageBox("⚠️ Please specify a Custom DLL.");
-                    return;
+                    if (!silentFailures)
+                        CreateMessageBox("⚠️ Please specify at least one custom DLL.");
+                    return false;
                 }
 
-                ModificationLibrary library = new(path);
+                var paths = path
+                    .Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(value => value.Trim().Trim('"'))
+                    .Where(value => value.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
 
-                if (!library.IsValid)
+                if (paths.Length == 0)
                 {
-                    CreateMessageBox("⚠️ The specified Custom DLL is potentially invalid or doesn't exist.");
-                    return;
+                    if (!silentFailures)
+                        CreateMessageBox("⚠️ Please specify at least one custom DLL.");
+                    return false;
+                }
+
+                var libraries = paths.Select(value => new ModificationLibrary(value)).ToArray();
+                if (libraries.Any(library => !library.IsValid))
+                {
+                    if (!silentFailures)
+                        CreateMessageBox("⚠️ One or more custom libraries are invalid or don't exist.");
+                    return false;
                 }
 
                 _launchButtonTextBlock.Text = "Launching...";
-                var processId = customTargetInjection
-                    ? await Task.Run(() => Injector.Launch(library, customTargetProcessName))
-                    : await Task.Run(() => Injector.Launch(initialized, library));
+                uint? processId;
+
+                if (customTargetInjection)
+                {
+                    processId = await Task.Run(() => Injector.Launch(libraries[0], customTargetProcessName));
+                    if (processId is not { })
+                    {
+                        if (!silentFailures)
+                            CreateMessageBox($"💡 Please start '{customTargetProcessName}' and try again.");
+                        return false;
+                    }
+                }
+                else
+                {
+                    processId = await Task.Run(() => Injector.Launch(initialized, libraries[0]));
+
+                    if (processId is not { })
+                    {
+                        if (!silentFailures)
+                            CreateMessageBox("💡 Please close the game & try again.");
+                        return false;
+                    }
+
+                }
+
+                foreach (var library in libraries.Skip(1))
+                    if (!await Task.Run(() => Injector.Launch(processId.Value, library)))
+                    {
+                        if (!silentFailures)
+                            CreateMessageBox($"💡 Failed to inject '{library.FileName}'.");
+                        return false;
+                    }
 
                 if (processId is not { })
                 {
                     if (customTargetInjection)
-                        CreateMessageBox($"💡 Please start '{customTargetProcessName}' and try again.");
+                    {
+                        if (!silentFailures)
+                            CreateMessageBox($"💡 Please start '{customTargetProcessName}' and try again.");
+                    }
                     else
-                        CreateMessageBox("💡 Please close the game & try again.");
-                    return;
+                    {
+                        if (!silentFailures)
+                            CreateMessageBox("💡 Please close the game & try again.");
+                    }
+                    return false;
                 }
 
                 StatusLabel.Text = customTargetInjection
-                    ? $"Launched Custom DLL into {customTargetProcessName}."
-                    : "Launched Custom DLL.";
-                return;
+                    ? $"Launched {libraries.Length} custom librar{(libraries.Length == 1 ? "y" : "ies")} into {customTargetProcessName}."
+                    : $"Launched {libraries.Length} custom DLL{(libraries.Length == 1 ? string.Empty : "s")}.";
+                return true;
             }
 
-            if (beta && !await DialogBox.ShowAsync("⚠️ Beta Usage", @"The beta build of the client might be potentially unstable. 
+            if (!silentFailures && beta && !await DialogBox.ShowAsync("⚠️ Beta Usage", @"The beta build of the client might be potentially unstable. 
 
 • Bugs & crashes might occur frequently during gameplay.
 • The beta build is meant for reporting bugs & issues with the client.
 
 Hence use at your own risk.", ("Cancel", false), ("Launch", true)))
-                return;
+                return false;
 
             if (!await client.DownloadAsync(ClientDownloadProgressAction))
             {
-                await DialogBox.ShowAsync("💡 Update Failed", @"A client update couldn't be downloaded.
+                if (!silentFailures)
+                    await DialogBox.ShowAsync("💡 Update Failed", @"A client update couldn't be downloaded.
 
 • Try closing the game & see if the client updates.
 • Try rebooting your machine & see if that resolves the issue.
 
 If you need help, join our Discord.", ("OK", true));
-                return;
+                return false;
             }
 
             _launchButtonTextBlock.Text = "Launching...";
-            if (!await Task.Run(() => client.Launch(initialized)))
-                await DialogBox.ShowAsync("💡 Launch Failure", @"The client couldn't inject correctly.
+            var launched = await Task.Run(() => client.Launch(initialized));
+
+            if (!launched)
+            {
+                if (!silentFailures)
+                    await DialogBox.ShowAsync("💡 Launch Failure", @"The client couldn't inject correctly.
 
 • Try closing the game & try again.
 • Remove & disable any 3rd party mods or tools.
 
 If you need help, join our Discord.", ("OK", true));
+                return false;
+            }
 
             StatusLabel.Text = $"Launched {(beta ? "Beta" : "Release")} DLL.";
+            return true;
         }
         finally
         {
@@ -406,6 +402,27 @@ If you need help, join our Discord.", ("OK", true));
         }
     }
 
+    void PlayStartupSound()
+    {
+        const string startupSoundPath = @"D:\diamond261\Downloads\1271923498243325953.ogg";
+
+        try
+        {
+            if (!File.Exists(startupSoundPath))
+                return;
+
+            _startupSoundPlayer.Open(new Uri(startupSoundPath, UriKind.Absolute));
+            _startupSoundPlayer.Volume = 1.0;
+            _startupSoundPlayer.Play();
+        }
+        catch { }
+    }
+
+    internal void SetAutoVoidDisabled(bool disabled)
+    {
+        _autoVoidDisabled = disabled;
+        StatusLabel.Text = _autoVoidDisabled ? "Auto Void disabled." : "Auto Void enabled.";
+    }
 
     public void ClientDownloadProgressAction(int value) => Dispatcher.Invoke(() =>
     {

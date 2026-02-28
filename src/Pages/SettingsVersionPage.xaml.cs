@@ -1,88 +1,102 @@
-﻿using Flarial.Launcher.Managers;
-using Flarial.Launcher.Services.Core;
-using Flarial.Launcher.Styles;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 
 namespace Flarial.Launcher.Pages;
 
-/// <summary>
-/// Interaction logic for SettingsVersionPage.xaml
-/// </summary>
 public partial class SettingsVersionPage : Page
 {
-    public static StackPanel sp;
+    readonly Settings _settings = Settings.Current;
 
-    async void LaunchButtonIsEnabledChanged(object sender, DependencyPropertyChangedEventArgs args)
+    readonly List<string> _items = [];
+
+    static IEnumerable<string> ParsePaths(string value)
     {
-        await System.Windows.Threading.Dispatcher.Yield();
+        if (string.IsNullOrWhiteSpace(value))
+            return Array.Empty<string>();
 
-        string[] files = await Task.Run(() => Directory.GetFiles(VersionManagement.launcherPath + "\\Versions"));
+        return value
+            .Split([';', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(path => path.Trim().Trim('"'))
+            .Where(path => path.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+    }
 
-        foreach (var name in MainWindow.VersionCatalog.Reverse())
-        {
-            VersionItem versionItem = new();
-            VersionItemStackPanel.Children.Add(versionItem);
-            VersionItemProperties.SetVersion(versionItem, name);
-            VersionItemProperties.SetState(versionItem, 0);
-
-            bool unpackaged = Minecraft.IsInstalled && !Minecraft.IsSigned;
-
-            if (unpackaged)
-            {
-                foreach (string file in files)
-                {
-                    if (file.Contains(name)) VersionItemProperties.SetState(versionItem, 2);
-                    await System.Windows.Threading.Dispatcher.Yield();
-                }
-            }
-
-            if (MinecraftGame.GetVersion().ToString() == name)
-            {
-                VersionItemProperties.SetState(versionItem, 3);
-                versionItem.IsChecked = true;
-            }
-
-            await System.Windows.Threading.Dispatcher.Yield();
-        }
-
-        if (VersionItemStackPanel.Children.Count > 0)
-        {
-            Trace.WriteLine("Heya");
-            VersionItem tempvi = (VersionItem)VersionItemStackPanel.Children[VersionItemStackPanel.Children.Count - 1];
-            tempvi.Margin = new Thickness(0);
-        }
-
-        var window = (MainWindow)Application.Current.MainWindow;
-        window.LaunchButton.IsEnabledChanged -= LaunchButtonIsEnabledChanged;
-
+    void Persist()
+    {
+        _settings.CustomDllPath = string.Join(";", _items);
+        DllListBox.ItemsSource = null;
+        DllListBox.ItemsSource = _items;
     }
 
     public SettingsVersionPage()
     {
         InitializeComponent();
-        sp = VersionItemStackPanel;
 
-        var window = (MainWindow)Application.Current.MainWindow;
-        window.LaunchButton.IsEnabledChanged += LaunchButtonIsEnabledChanged;
+        _items.AddRange(ParsePaths(_settings.CustomDllPath));
+        Persist();
     }
-}
 
+    void Add_Click(object sender, RoutedEventArgs e)
+    {
+        OpenFileDialog dialog = new()
+        {
+            InitialDirectory = @"C:\",
+            CheckFileExists = true,
+            CheckPathExists = true,
+            Multiselect = true,
+            DefaultExt = "dll",
+            Filter = "DLL Files|*.dll;",
+            Title = "Select Custom DLL(s)"
+        };
 
-public class Root
-{
-    public List<Version> Versions { get; set; }
-}
+        if (dialog.ShowDialog() is not true)
+            return;
 
-public class Version
-{
-    public string Name { get; set; }
-    public string ImgURL { get; set; }
-    public string verlink { get; set; }
+        foreach (var file in dialog.FileNames)
+            if (!_items.Contains(file, StringComparer.OrdinalIgnoreCase))
+                _items.Add(file);
+
+        Persist();
+    }
+
+    void Remove_Click(object sender, RoutedEventArgs e)
+    {
+        if (DllListBox.SelectedItem is not string selected)
+            return;
+
+        _items.RemoveAll(value => value.Equals(selected, StringComparison.OrdinalIgnoreCase));
+        Persist();
+    }
+
+    void Up_Click(object sender, RoutedEventArgs e)
+    {
+        if (DllListBox.SelectedItem is not string selected)
+            return;
+
+        var index = _items.FindIndex(value => value.Equals(selected, StringComparison.OrdinalIgnoreCase));
+        if (index <= 0)
+            return;
+
+        (_items[index - 1], _items[index]) = (_items[index], _items[index - 1]);
+        Persist();
+        DllListBox.SelectedItem = selected;
+    }
+
+    void Down_Click(object sender, RoutedEventArgs e)
+    {
+        if (DllListBox.SelectedItem is not string selected)
+            return;
+
+        var index = _items.FindIndex(value => value.Equals(selected, StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || index >= _items.Count - 1)
+            return;
+
+        (_items[index], _items[index + 1]) = (_items[index + 1], _items[index]);
+        Persist();
+        DllListBox.SelectedItem = selected;
+    }
 }

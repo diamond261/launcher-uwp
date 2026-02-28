@@ -43,6 +43,18 @@ public abstract class FlarialClient
         using NativeMutex mutex = new(Identifer); return mutex.Duplicate(processId);
     }
 
+    public bool Launch(uint processId)
+    {
+        if (Client is { } client)
+        {
+            if (!ReferenceEquals(this, client)) return false;
+            return true;
+        }
+
+        if (!Injector.Launch(processId, Library)) return false;
+        using NativeMutex mutex = new(Identifer); return mutex.Duplicate(processId);
+    }
+
     static readonly object _lock = new();
 
     static readonly HashAlgorithm _algorithm = SHA256.Create();

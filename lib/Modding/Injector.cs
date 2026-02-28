@@ -28,10 +28,49 @@ public unsafe static class Injector
 
     static Injector()
     {
-        fixed (char* module = "Kernel32") fixed (byte* procedure = UTF8.GetBytes("LoadLibraryW"))
+        fixed (char* module = "Kernel32")
+        fixed (byte* procedure = UTF8.GetBytes("LoadLibraryW"))
         {
             var address = GetProcAddress(GetModuleHandle(module), new(procedure));
             s_routine = address.CreateDelegate<LPTHREAD_START_ROUTINE>();
+        }
+    }
+
+    static void TrySetAppContainerFileAccess(string fileName)
+    {
+        try
+        {
+            var security = File.GetAccessControl(fileName);
+            security.SetAccessRule(s_rule);
+            File.SetAccessControl(fileName, security);
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
+    }
+
+    static bool InjectIntoProcess(HANDLE process, ModificationLibrary library)
+    {
+        HANDLE thread = Null;
+        void* address = null;
+        try
+        {
+            var size = (nuint)(library.FileName.Length + 1) * sizeof(char);
+
+            address = VirtualAllocEx(process, null, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+            fixed (char* buffer = library.FileName) WriteProcessMemory(process, address, buffer, size, null);
+
+            thread = CreateRemoteThread(process, null, 0, s_routine, address, 0, null);
+            WaitForSingleObject(thread, INFINITE);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            CloseHandle(thread);
+            VirtualFreeEx(process, address, 0, MEM_RELEASE);
         }
     }
 
@@ -40,29 +79,26 @@ public unsafe static class Injector
         if (!library.Exists) throw new FileNotFoundException(null, library.FileName);
         if (!library.IsValid) throw new BadImageFormatException(null, library.FileName);
 
-        var security = File.GetAccessControl(library.FileName);
-        security.SetAccessRule(s_rule);
-        File.SetAccessControl(library.FileName, security);
+        TrySetAppContainerFileAccess(library.FileName);
 
         if (Minecraft.Current.Launch(initialized) is not { } processId) return null;
         if (Open(PROCESS_ALL_ACCESS, processId) is not { } process) return null;
 
         using (process)
-        {
-            HANDLE thread = Null; void* address = null; try
-            {
-                var size = (nuint)(library.FileName.Length + 1) * sizeof(char);
+            return InjectIntoProcess(process, library) ? processId : null;
+    }
 
-                address = VirtualAllocEx(process, null, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-                fixed (char* buffer = library.FileName) WriteProcessMemory(process, address, buffer, size, null);
+    public static bool Launch(uint processId, ModificationLibrary library)
+    {
+        if (!library.Exists) throw new FileNotFoundException(null, library.FileName);
+        if (!library.IsValid) throw new BadImageFormatException(null, library.FileName);
 
-                thread = CreateRemoteThread(process, null, 0, s_routine, address, 0, null);
-                WaitForSingleObject(thread, INFINITE);
+        TrySetAppContainerFileAccess(library.FileName);
 
-                return processId;
-            }
-            finally { CloseHandle(thread); VirtualFreeEx(process, address, 0, MEM_RELEASE); }
-        }
+        if (Open(PROCESS_ALL_ACCESS, processId) is not { } process) return false;
+
+        using (process)
+            return InjectIntoProcess(process, library);
     }
 
     public static uint? Launch(ModificationLibrary library, string targetProcessName)
@@ -78,34 +114,7 @@ public unsafe static class Injector
 
         if (target is null) return null;
 
-        var security = File.GetAccessControl(library.FileName);
-        security.SetAccessRule(s_rule);
-        File.SetAccessControl(library.FileName, security);
-
         var processId = (uint)target.Id;
-        if (Open(PROCESS_ALL_ACCESS, processId) is not { } process) return null;
-
-        using (process)
-        {
-            HANDLE thread = Null;
-            void* address = null;
-            try
-            {
-                var size = (nuint)(library.FileName.Length + 1) * sizeof(char);
-
-                address = VirtualAllocEx(process, null, size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-                fixed (char* buffer = library.FileName) WriteProcessMemory(process, address, buffer, size, null);
-
-                thread = CreateRemoteThread(process, null, 0, s_routine, address, 0, null);
-                WaitForSingleObject(thread, INFINITE);
-
-                return processId;
-            }
-            finally
-            {
-                CloseHandle(thread);
-                VirtualFreeEx(process, address, 0, MEM_RELEASE);
-            }
-        }
+        return Launch(processId, library) ? processId : null;
     }
 }

@@ -77,8 +77,8 @@ public partial class SettingsGeneralPage : Page
 
         // Start - Overrides some stuff from the Launch Button template.
 
-        OverrideLaunchButtonTemplate(ClientFolderButton, "📁 Folder");
-        OverrideLaunchButtonTemplate(LauncherFolderButton, "📁 Folder");
+        OverrideLaunchButtonTemplate(ClientFolderButton, "📁 Client Folder");
+        OverrideLaunchButtonTemplate(LauncherFolderButton, "📁 Launcher Folder");
 
         // End - Overrides some stuff from the Launch Button template.
 
@@ -161,18 +161,25 @@ public partial class SettingsGeneralPage : Page
         AutoLogin.IsChecked = _settings.AutoLogin;
         HardwareAcceleration.IsChecked = _settings.HardwareAcceleration;
         SaveOnTray.IsChecked = _settings.SaveOnTray;
-        AutoInject.IsChecked = _settings.AutoInject;
 
         WaitForInitialization.IsChecked = _settings.WaitForInitialization;
-        DLLTextBox.Value = _settings.CustomDllPath;
         CustomTargetInjection.IsChecked = _settings.CustomTargetInjection;
-        CustomTargetTextBox.Text = _settings.CustomTargetProcessName;
+        CustomTargetTextBox.Text = string.IsNullOrWhiteSpace(_settings.CustomTargetProcessName)
+            ? "Minecraft.Windows.exe"
+            : _settings.CustomTargetProcessName;
+
+        SettingsPage.SetDllPageVisibility(_settings.DllBuild is DllBuild.Custom);
 
         if (_settings.CustomTargetInjection)
             Animations.ToggleButtonTransitions.CheckedAnimation(CustomTargetGrid);
 
+        CustomTargetTextBox.IsEnabled = _settings.CustomTargetInjection;
+
 
         var window = (MainWindow)Application.Current.MainWindow;
+        if (window is not null)
+            DisableAutoVoid.IsChecked = window.IsAutoVoidDisabled;
+
         if (window != null) window.ContentRendered -= Window_ContentRendered;
     }
 
@@ -181,24 +188,6 @@ public partial class SettingsGeneralPage : Page
         var button = (ToggleButton)sender;
         if (button.IsChecked is not bool @checked) return;
         _settings.WaitForInitialization = @checked;
-    }
-
-    void CustomTargetInjection_Click(object sender, RoutedEventArgs args)
-    {
-        var button = (ToggleButton)sender;
-        if (button.IsChecked is not bool @checked) return;
-
-        _settings.CustomTargetInjection = @checked;
-
-        if (@checked)
-            Animations.ToggleButtonTransitions.CheckedAnimation(CustomTargetGrid);
-        else
-            Animations.ToggleButtonTransitions.UnCheckedAnimation(CustomTargetGrid);
-    }
-
-    void CustomTargetTextBox_OnTextChanged(object sender, TextChangedEventArgs args)
-    {
-        _settings.CustomTargetProcessName = CustomTargetTextBox.Text;
     }
 
     void HardwareAcceleration_Click(object sender, RoutedEventArgs e)
@@ -223,15 +212,16 @@ public partial class SettingsGeneralPage : Page
         settings.SaveOnTray = @checked;
     }
 
-    void AutoInject_Click(object sender, RoutedEventArgs e)
+    void DisableAutoVoid_Click(object sender, RoutedEventArgs e)
     {
-        var settings = Settings.Current;
-        var button = (ToggleButton)sender;
+        if (Application.Current.MainWindow is not MainWindow window)
+            return;
 
+        var button = (ToggleButton)sender;
         if (button.IsChecked is not bool @checked)
             return;
 
-        settings.AutoInject = @checked;
+        window.SetAutoVoidDisabled(@checked);
     }
 
     private void ToggleButton_Click_1(object sender, RoutedEventArgs e)
@@ -264,10 +254,42 @@ public partial class SettingsGeneralPage : Page
         if (Enum.TryParse<DllBuild>(content, out var build))
             settings.DllBuild = build;
 
+        SettingsPage.SetDllPageVisibility(build is DllBuild.Custom);
+
         if (build is DllBuild.Custom)
-            Animations.ToggleButtonTransitions.CheckedAnimation(DllGrid);
+            Animations.ToggleButtonTransitions.CheckedAnimation(CustomTargetGrid);
+        else
+        {
+            settings.CustomTargetInjection = false;
+            CustomTargetInjection.IsChecked = false;
+            CustomTargetTextBox.IsEnabled = false;
+            Animations.ToggleButtonTransitions.UnCheckedAnimation(CustomTargetGrid);
+        }
     }
 
-    private void CustomRadioButton_OnUnchecked(object sender, RoutedEventArgs e)
-        => Animations.ToggleButtonTransitions.UnCheckedAnimation(DllGrid);
+    void CustomTargetInjection_Click(object sender, RoutedEventArgs args)
+    {
+        var button = (ToggleButton)sender;
+        if (button.IsChecked is not bool @checked) return;
+
+        _settings.CustomTargetInjection = @checked;
+
+        if (@checked)
+        {
+            CustomTargetTextBox.IsEnabled = true;
+            Animations.ToggleButtonTransitions.CheckedAnimation(CustomTargetGrid);
+        }
+        else
+        {
+            CustomTargetTextBox.IsEnabled = false;
+            Animations.ToggleButtonTransitions.UnCheckedAnimation(CustomTargetGrid);
+        }
+    }
+
+    void CustomTargetTextBox_OnTextChanged(object sender, TextChangedEventArgs args)
+    {
+        _settings.CustomTargetProcessName = string.IsNullOrWhiteSpace(CustomTargetTextBox.Text)
+            ? "Minecraft.Windows.exe"
+            : CustomTargetTextBox.Text;
+    }
 }

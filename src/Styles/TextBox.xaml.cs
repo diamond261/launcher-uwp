@@ -27,14 +27,16 @@ namespace Flarial.Launcher.Styles
             dialog.InitialDirectory = @"C:\";
             dialog.CheckFileExists = true;
             dialog.CheckPathExists = true;
-            dialog.Multiselect = false;
+            dialog.Multiselect = true;
 
             dialog.DefaultExt = "dll";
             dialog.Filter = "DLL Files|*.dll;";
             dialog.Title = "Select Custom DLL";
             if (dialog.ShowDialog() != true) return;
-            textbox.Text = dialog.FileName;
-            _settings.CustomDllPath = dialog.FileName;
+            var files = dialog.FileNames;
+            var value = string.Join(";", files);
+            textbox.Text = value;
+            _settings.CustomDllPath = value;
             SettingsGeneralPage.saveButton.IsChecked = true;
         }
 

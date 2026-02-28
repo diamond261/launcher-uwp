@@ -15,6 +15,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
             <Grid HorizontalAlignment="Left">
                 <Label Margin="0,0,0,5" HorizontalAlignment="Left" FontFamily="pack://application:,,,/Assets/#Space Grotesk" Content="Client" Foreground="White" FontSize="24" FontWeight="Bold"/>
@@ -78,13 +79,9 @@
                         <RadioButton IsEnabled="false" Name="NightlyRadioButton" Checked="BuildChanged" Content="Nightly" Tag="2"/>
                     </Grid>
                     
-                    <RadioButton Grid.Column="6" Name="CustomRadioButton" Checked="BuildChanged" Unchecked="CustomRadioButton_OnUnchecked" Content="Custom" Tag="3"/>
+                    <RadioButton Grid.Column="6" Name="CustomRadioButton" Checked="BuildChanged" Content="Custom" Tag="3"/>
                 </Grid>
             </Border>
-            <Grid Height="0" Name="DllGrid">
-                <styles:TextBox x:Name="DLLTextBox"/>
-            </Grid>
-
             <ToggleButton Click="CustomTargetInjection_Click" Name="CustomTargetInjection" Content="Custom Target Injection" Style="{StaticResource ToggleButton}"/>
             <Grid Height="0" Name="CustomTargetGrid">
                 <Grid Height="30" Width="515" Margin="0,2.5,0,2.5">
@@ -97,10 +94,8 @@
                     <TextBox Name="CustomTargetTextBox" BorderThickness="0" Background="Transparent" Foreground="White" CaretBrush="White" FontSize="14" FontFamily="pack://application:,,,/Assets/#Space Grotesk" Margin="8,0,8,0" VerticalContentAlignment="Center" TextChanged="CustomTargetTextBox_OnTextChanged" ToolTip="Target process name or exe, e.g. notepad or notepad.exe"/>
                 </Grid>
             </Grid>
-
             <ToggleButton Click="WaitForInitializationClick" Name="WaitForInitialization" Content="Wait For Initialization" Style="{StaticResource ToggleButton}"/>
-            <Button Margin="3.125,0,0,0" Name="ClientFolderButton" Cursor="Hand" Template="{StaticResource LaunchButtonTemplate}"/>
-         
+          
             <Grid HorizontalAlignment="Left">
                 <Label Margin="0,0,0,5" HorizontalAlignment="Left" FontFamily="pack://application:,,,/Assets/#Space Grotesk" Content="Launcher" Foreground="White" FontSize="24" FontWeight="Bold"/>
                 <Border Margin="5,0,0,5" VerticalAlignment="Bottom" Background="#FF2438" Height="3" />
@@ -109,9 +104,18 @@
             <ToggleButton Visibility="Collapsed" Click="ToggleButton_Click_1" Name="AutoLogin" Content="Auto Login" Style="{StaticResource ToggleButton}"/>
             <ToggleButton Click="HardwareAcceleration_Click" Name="HardwareAcceleration" Content="Hardware Acceleration" Style="{StaticResource ToggleButton}"/>
             <ToggleButton Click="SaveOnTray_Click" Name="SaveOnTray" Content="Save On Tray" Style="{StaticResource ToggleButton}"/>
-            <ToggleButton Click="AutoInject_Click" Name="AutoInject" Content="Auto Inject" Style="{StaticResource ToggleButton}"/>
-            <Button Name="LauncherFolderButton" Cursor="Hand" Template="{StaticResource LaunchButtonTemplate}"/>       
+            <ToggleButton Click="DisableAutoVoid_Click" Name="DisableAutoVoid" Content="Disable Auto Void" Style="{StaticResource ToggleButton}"/>
+            <Grid Margin="0,4,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Name="ClientFolderButton" Cursor="Hand" Template="{StaticResource LaunchButtonTemplate}"/>
+                <Button Grid.Column="2" Name="LauncherFolderButton" Cursor="Hand" Template="{StaticResource LaunchButtonTemplate}"/>
+            </Grid>
         </StackPanel>
+        </ScrollViewer>
         <ToggleButton Visibility="Hidden" Margin="0,0,0,0" Name="SaveButton" Grid.Row="1" IsChecked="False" HorizontalAlignment="Left" VerticalAlignment="Bottom" Cursor="Hand">
             <ToggleButton.Template>
                 <ControlTemplate>

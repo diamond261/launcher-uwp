@@ -7,8 +7,6 @@ using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using Flarial.Launcher.Services.Core;
-using Windows.Devices.Midi;
-using Windows.UI.Xaml.Controls.Maps;
 
 namespace Flarial.Launcher;
 
@@ -48,9 +46,6 @@ sealed partial class Settings
     [DataMember]
     internal bool SaveOnTray;
 
-    [DataMember]
-    internal bool AutoInject;
-
     internal bool AutoLogin = true;
 }
 
@@ -65,8 +60,6 @@ partial class Settings
         CustomTargetInjection = false;
         CustomTargetProcessName = "Minecraft.Windows.exe";
         SaveOnTray = false;
-        AutoInject = false;
-
         AutoLogin = true;
         HardwareAcceleration = true;
     }
@@ -95,6 +88,9 @@ sealed partial class Settings
                     var build = _current.DllBuild;
                     if (!Enum.IsDefined(typeof(DllBuild), build))
                         _current.DllBuild = DllBuild.Release;
+
+                    if (string.IsNullOrWhiteSpace(_current.CustomTargetProcessName))
+                        _current.CustomTargetProcessName = "Minecraft.Windows.exe";
                 }
                 catch { _current = new(); }
 
