@@ -102,8 +102,6 @@ public partial class SettingsGeneralPage : Page
             }
         };*/
 
-        var window = (MainWindow)Application.Current.MainWindow;
-
         LauncherFolderButton.Click += (_, _) =>
         {
             using (Process.Start(new ProcessStartInfo
@@ -117,7 +115,7 @@ public partial class SettingsGeneralPage : Page
         {
             if (!Minecraft.IsInstalled)
             {
-                MainWindow.CreateMessageBox("⚠️ Please install the game.");
+                MainWindow.CreateMessageBox("Please install the game.");
                 return;
             }
 
@@ -125,17 +123,20 @@ public partial class SettingsGeneralPage : Page
 
             if (!Directory.Exists(startInfo.FileName))
             {
-                MainWindow.CreateMessageBox("⚠️ Please launch the client at least once to generate its folder.");
+                MainWindow.CreateMessageBox("Please launch the client at least once to generate its folder.");
                 return;
             }
 
             using (Process.Start(startInfo)) { }
         };
 
-        window.ContentRendered += Window_ContentRendered;
+        if (string.IsNullOrWhiteSpace(CustomTargetTextBox.Text))
+            CustomTargetTextBox.Text = "Minecraft.Windows.exe";
+
+        Loaded += Window_ContentRendered;
     }
 
-    void Window_ContentRendered(object sender, EventArgs args)
+    void Window_ContentRendered(object sender, RoutedEventArgs args)
     {
         switch (_settings.DllBuild)
         {
@@ -178,9 +179,12 @@ public partial class SettingsGeneralPage : Page
 
         var window = (MainWindow)Application.Current.MainWindow;
         if (window is not null)
-            DisableAutoVoid.IsChecked = window.IsAutoVoidDisabled;
+        {
+            DisableAutoVoid.IsChecked = _settings.DisableAutoVoid;
+            window.SetAutoVoidDisabled(_settings.DisableAutoVoid);
+        }
 
-        if (window != null) window.ContentRendered -= Window_ContentRendered;
+        Loaded -= Window_ContentRendered;
     }
 
     void WaitForInitializationClick(object sender, RoutedEventArgs args)
@@ -221,6 +225,7 @@ public partial class SettingsGeneralPage : Page
         if (button.IsChecked is not bool @checked)
             return;
 
+        _settings.DisableAutoVoid = @checked;
         window.SetAutoVoidDisabled(@checked);
     }
 

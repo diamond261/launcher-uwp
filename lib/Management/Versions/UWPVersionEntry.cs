@@ -24,7 +24,9 @@ sealed class UWPVersionEntry : VersionEntry
 
     readonly string _content;
     static readonly string s_content;
-    static readonly DataContractJsonSerializer s_serializer = new(typeof(string[][]), s_settings);
+    static readonly DataContractJsonSerializer s_serializer = new(typeof(object[][]), s_settings);
+
+    static string WithCacheBust(string uri) => $"{uri}?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
 
     UWPVersionEntry(string identifier) : base() => _content = string.Format(s_content, identifier, '1');
 
@@ -38,27 +40,39 @@ sealed class UWPVersionEntry : VersionEntry
         s_content = reader.ReadToEnd();
     }
 
-    internal static async Task<Dictionary<string, VersionEntry>> GetAsync(HashSet<string> supported) => await Task.Run(async () =>
+    internal static async Task<Dictionary<string, VersionEntry>> GetAsync() => await Task.Run(async () =>
     {
-        string[][] collection;
+        object[][] collection;
         Dictionary<string, VersionEntry> entries = [];
 
-        using (var stream = await HttpService.GetAsync<Stream>(PackagesUri))
+        using (var stream = await HttpService.GetAsync<Stream>(WithCacheBust(PackagesUri)))
         {
             var @object = s_serializer.ReadObject(stream);
-            collection = (string[][])@object;
+            collection = (object[][])@object;
         }
 
         foreach (var item in collection)
         {
-            if (item[2] != "0") continue;
+            if (item.Length < 2)
+                continue;
 
-            var version = item[0];
+            if (item.Length > 2 && Convert.ToInt32(item[2]) != 0)
+                continue;
+
+            var version = item[0]?.ToString() ?? string.Empty;
             var index = version.LastIndexOf('.');
 
+            if (index <= 0)
+                continue;
+
+            var identifier = item[1]?.ToString() ?? string.Empty;
+            if (identifier.Length == 0)
+                continue;
+
             version = version.Substring(0, index);
-            if (!supported.Contains(version)) continue;
-            entries.Add(version, new UWPVersionEntry(item[1]));
+
+            if (!entries.ContainsKey(version))
+                entries.Add(version, new UWPVersionEntry(identifier));
         }
 
         return entries;

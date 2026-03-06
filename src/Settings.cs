@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -46,6 +47,15 @@ sealed partial class Settings
     [DataMember]
     internal bool SaveOnTray;
 
+    [DataMember]
+    internal bool DisableAutoVoid;
+
+    [DataMember]
+    internal Dictionary<string, string> DllPresets = [];
+
+    [DataMember]
+    internal string ActiveDllPreset = "Default";
+
     internal bool AutoLogin = true;
 }
 
@@ -60,6 +70,9 @@ partial class Settings
         CustomTargetInjection = false;
         CustomTargetProcessName = "Minecraft.Windows.exe";
         SaveOnTray = false;
+        DisableAutoVoid = false;
+        DllPresets = [];
+        ActiveDllPreset = "Default";
         AutoLogin = true;
         HardwareAcceleration = true;
     }
@@ -91,6 +104,10 @@ sealed partial class Settings
 
                     if (string.IsNullOrWhiteSpace(_current.CustomTargetProcessName))
                         _current.CustomTargetProcessName = "Minecraft.Windows.exe";
+
+                    _current.DllPresets ??= [];
+                    if (string.IsNullOrWhiteSpace(_current.ActiveDllPreset))
+                        _current.ActiveDllPreset = "Default";
                 }
                 catch { _current = new(); }
 

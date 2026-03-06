@@ -8,6 +8,29 @@
       Height="470"
       Width="555">
     <Page.Resources>
+        <Style x:Key="FancyDllCheckBox" TargetType="CheckBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Width="18" Height="18">
+                            <Border x:Name="Box" CornerRadius="5" Background="#251D1E" BorderBrush="#5A4446" BorderThickness="1.5"/>
+                            <Path x:Name="Tick" Data="M3,9 L7,13 L15,4" Stroke="#FF2438" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Visibility="Collapsed"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#7A5C5F"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="#2F2324"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#FF2438"/>
+                                <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ActionButtonStyle" TargetType="Button">
             <Setter Property="Height" Value="36"/>
             <Setter Property="Margin" Value="0,0,0,8"/>
@@ -70,6 +93,27 @@
                      FontFamily="pack://application:,,,/Assets/#Space Grotesk"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Grid.Column="0"
+                                      Style="{StaticResource FancyDllCheckBox}"
+                                      IsChecked="{Binding Enabled}"
+                                      Checked="EntryEnabledChanged"
+                                      Unchecked="EntryEnabledChanged"
+                                      VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Path}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Padding" Value="8,6"/>

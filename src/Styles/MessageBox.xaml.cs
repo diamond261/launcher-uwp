@@ -2,6 +2,7 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 
 namespace Flarial.Launcher.Styles
@@ -13,6 +14,7 @@ namespace Flarial.Launcher.Styles
     {
         public string Text { get; set; }
         public bool ShowFlarialLogo { get; set; }
+        bool _closing;
 
         public MessageBox()
         {
@@ -22,7 +24,20 @@ namespace Flarial.Launcher.Styles
         }
 
         private async void ButtonBase_OnClick(object sender, RoutedEventArgs e)
+            => await CloseAsync();
+
+        private async void MessageBox_OnLoaded(object sender, RoutedEventArgs e)
         {
+            await Task.Delay(3000);
+            await CloseAsync();
+        }
+
+        async Task CloseAsync()
+        {
+            if (_closing)
+                return;
+
+            _closing = true;
             var sb = new Storyboard();
 
             var an1 = new DoubleAnimation
@@ -39,10 +54,10 @@ namespace Flarial.Launcher.Styles
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
             };
 
-            var an3 = new ThicknessAnimation()
+            var an3 = new ThicknessAnimation
             {
                 Duration = TimeSpan.FromMilliseconds(200),
-                To = new Thickness(0, 0, 0, 0),
+                To = new Thickness(0, 25, 0, -25),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
             };
 
@@ -60,13 +75,33 @@ namespace Flarial.Launcher.Styles
             sb.Begin(this);
 
             await Task.Delay(200);
-            try
+            RemoveFromVisualTree();
+        }
+
+        void RemoveFromVisualTree()
+        {
+            if (Parent is Panel directPanel)
             {
-                ((StackPanel)this.Parent).Children.Remove(this);
+                directPanel.Children.Remove(this);
+                return;
             }
-            catch (Exception)
+
+            DependencyObject current = this;
+            while (current is not null)
             {
-                // im dogshit at coding lmao
+                if (current is Panel panel)
+                {
+                    panel.Children.Remove(this);
+                    return;
+                }
+
+                if (current is ContentControl contentControl && ReferenceEquals(contentControl.Content, this))
+                {
+                    contentControl.Content = null;
+                    return;
+                }
+
+                current = VisualTreeHelper.GetParent(current) ?? LogicalTreeHelper.GetParent(current) as DependencyObject;
             }
         }
     }

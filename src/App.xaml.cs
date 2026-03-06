@@ -45,6 +45,7 @@ Exception: {1}
         var message = exception.Message;
 
         var text = string.Format(Format, version, name, message, trace);
+        Logger.Error("Unhandled exception", (Exception)args.ExceptionObject);
         MessageBox.Show(text, "Flarial Launcher: Error", MessageBoxButton.OK, MessageBoxImage.Error);
 
         Environment.Exit(1);
@@ -69,6 +70,9 @@ Exception: {1}
         Directory.CreateDirectory(BackupManager.backupDirectory);
         Directory.CreateDirectory(@$"{VersionManagement.launcherPath}\Versions");
         Directory.CreateDirectory(@$"{VersionManagement.launcherPath}\Logs");
+        var assembly = Assembly.GetExecutingAssembly();
+        var version = assembly.GetName().Version?.ToString() ?? "unknown";
+        Logger.Info($"Application startup | exe={assembly.Location} | version={version}");
 
         string path = @$"{VersionManagement.launcherPath}\cachedToken.txt";
         if (!File.Exists(path)) File.WriteAllText(path, string.Empty);

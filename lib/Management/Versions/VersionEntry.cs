@@ -8,7 +8,9 @@ public abstract class VersionEntry
 {
     internal abstract Task<string> UriAsync();
 
-    public async Task<InstallRequest> InstallAsync(Action<int> action) => new(await UriAsync(), action);
+    internal virtual async Task<string[]> UrisAsync() => [await UriAsync()];
+
+    public async Task<InstallRequest> InstallAsync(Action<int> action) => new(await UrisAsync(), action);
 
     private protected static readonly DataContractJsonSerializerSettings s_settings = new() { UseSimpleDictionaryFormat = true };
 }

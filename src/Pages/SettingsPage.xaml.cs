@@ -38,12 +38,32 @@ public partial class SettingsPage : Page
 
     private void Navigate_Dll(object sender, RoutedEventArgs e)
     {
+        SettingsPageTransition.SettingsNavigateAnimation(-1000, PageBorder, PageStackPanel);
+    }
+
+    private void Navigate_Switcher(object sender, RoutedEventArgs e)
+    {
+        if (SwitcherFrame.Content is null)
+        {
+            try
+            {
+                SwitcherFrame.Content = new SettingsSwitcherPage();
+            }
+            catch (Exception exception)
+            {
+                Logger.Error("Failed to open switcher page", exception);
+                MainWindow.CreateMessageBox($"Failed to open switcher page: {exception.Message}");
+                GeneralPageButton.IsChecked = true;
+                return;
+            }
+        }
+
         SettingsPageTransition.SettingsNavigateAnimation(-500, PageBorder, PageStackPanel);
     }
 
     private void Navigate_Backups(object sender, RoutedEventArgs e)
     {
-        SettingsPageTransition.SettingsNavigateAnimation(-1000, PageBorder, PageStackPanel);
+        SettingsPageTransition.SettingsNavigateAnimation(-1500, PageBorder, PageStackPanel);
     }
 
     internal static void SetDllPageVisibility(bool visible)

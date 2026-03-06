@@ -63,8 +63,53 @@ public partial class MainWindow
     internal bool IsAutoVoidDisabled => _autoVoidDisabled;
 
     readonly MediaPlayer _startupSoundPlayer = new();
+    readonly MediaPlayer _autoVoidSoundPlayer = new();
+    string _autoVoidLoadedPath = string.Empty;
+    bool _autoVoidSoundReady;
+
+    static readonly string[] s_autoVoidSoundCandidates =
+    [
+        Path.Combine(AppContext.BaseDirectory, "viod.ogg"),
+        Path.Combine(Environment.CurrentDirectory, "viod.ogg"),
+        Path.Combine(AppContext.BaseDirectory, "1271923498243325953.ogg"),
+        Path.Combine(Environment.CurrentDirectory, "1271923498243325953.ogg")
+    ];
 
     readonly Settings _settings = Settings.Current;
+
+    static string[] ParseEnabledCustomLibraries(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return [];
+
+        return path
+            .Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(value => value.Trim().Trim('"'))
+            .Where(value => value.Length > 0)
+            .Select(value =>
+            {
+                var index = value.IndexOf('|');
+                if (index <= 0)
+                    return (enabled: true, path: value);
+
+                var prefix = value.Substring(0, index).Trim();
+                var actualPath = value.Substring(index + 1).Trim();
+
+                if (actualPath.Length == 0)
+                    return (enabled: false, path: string.Empty);
+
+                return prefix switch
+                {
+                    "1" => (enabled: true, path: actualPath),
+                    "0" => (enabled: false, path: actualPath),
+                    _ => (enabled: true, path: value)
+                };
+            })
+            .Where(item => item.enabled)
+            .Select(item => item.path)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
 
     public MainWindow()
     {
@@ -105,6 +150,10 @@ public partial class MainWindow
         Application.Current.MainWindow = this;
 
         SetGreetingLabel();
+
+        SetAutoVoidDisabled(_settings.DisableAutoVoid);
+        _autoVoidSoundPlayer.MediaOpened += (_, _) => _autoVoidSoundReady = true;
+        _autoVoidSoundPlayer.MediaFailed += (_, _) => _autoVoidSoundReady = false;
 
         IsLaunchEnabled = false;
     }
@@ -174,9 +223,9 @@ public partial class MainWindow
         base.OnSourceInitialized(e);
 
         _ = CheckLicenseAsync();
-        CreateMessageBox("📢 Join our Discord! https://flarial.xyz/discord");
+        CreateMessageBox("Join our Discord: https://flarial.xyz/discord");
 
-        if (!_settings.HardwareAcceleration) CreateMessageBox("⚠️ Hardware acceleration is disabled.");
+        if (!_settings.HardwareAcceleration) CreateMessageBox("Hardware acceleration is disabled.");
     }
 
     static readonly SolidColorBrush _darkRed = new(Colors.DarkRed);
@@ -228,7 +277,23 @@ public partial class MainWindow
     private void WindowClose(object sender, RoutedEventArgs e) => Close();
 
     private void ButtonBase_OnClick(object sender, RoutedEventArgs e) =>
-        SettingsPageTransition.SettingsEnterAnimation(MainBorder, MainGrid);
+        OpenSettings();
+
+    void OpenSettings()
+    {
+        try
+        {
+            if (SettingsFrame.Source is null)
+                SettingsFrame.Source = new Uri("Pages/SettingsPage.xaml", UriKind.Relative);
+
+            SettingsPageTransition.SettingsEnterAnimation(MainBorder, MainGrid);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error("Failed to open settings page", exception);
+            CreateMessageBox($"Failed to open settings: {exception.Message}");
+        }
+    }
 
     private void UIElement_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
         NewsPageTransition.Animation(Reverse, MainBorder, NewsBorder, NewsArrow);
@@ -252,13 +317,14 @@ public partial class MainWindow
     {
         try
         {
+            PlayAutoVoidLaunchSound();
             IsLaunchEnabled = false;
             _launchButtonTextBlock.Text = "Verifying...";
 
             if (!Minecraft.IsInstalled)
             {
                 if (!silentFailures)
-                    CreateMessageBox(@"⚠️ Please install the game.");
+                    CreateMessageBox(@"Please install the game.");
                 return false;
             }
 
@@ -276,21 +342,16 @@ public partial class MainWindow
                 if (string.IsNullOrWhiteSpace(path))
                 {
                     if (!silentFailures)
-                        CreateMessageBox("⚠️ Please specify at least one custom DLL.");
+                        CreateMessageBox("Please specify at least one custom DLL.");
                     return false;
                 }
 
-                var paths = path
-                    .Split(new[] { ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
-                    .Select(value => value.Trim().Trim('"'))
-                    .Where(value => value.Length > 0)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
+                var paths = ParseEnabledCustomLibraries(path);
 
                 if (paths.Length == 0)
                 {
                     if (!silentFailures)
-                        CreateMessageBox("⚠️ Please specify at least one custom DLL.");
+                        CreateMessageBox("Please specify at least one custom DLL.");
                     return false;
                 }
 
@@ -298,7 +359,7 @@ public partial class MainWindow
                 if (libraries.Any(library => !library.IsValid))
                 {
                     if (!silentFailures)
-                        CreateMessageBox("⚠️ One or more custom libraries are invalid or don't exist.");
+                        CreateMessageBox("One or more custom libraries are invalid or don't exist.");
                     return false;
                 }
 
@@ -311,7 +372,7 @@ public partial class MainWindow
                     if (processId is not { })
                     {
                         if (!silentFailures)
-                            CreateMessageBox($"💡 Please start '{customTargetProcessName}' and try again.");
+                            CreateMessageBox($"Please start '{customTargetProcessName}' and try again.");
                         return false;
                     }
                 }
@@ -322,7 +383,7 @@ public partial class MainWindow
                     if (processId is not { })
                     {
                         if (!silentFailures)
-                            CreateMessageBox("💡 Please close the game & try again.");
+                            CreateMessageBox("Please close the game and try again.");
                         return false;
                     }
 
@@ -332,7 +393,7 @@ public partial class MainWindow
                     if (!await Task.Run(() => Injector.Launch(processId.Value, library)))
                     {
                         if (!silentFailures)
-                            CreateMessageBox($"💡 Failed to inject '{library.FileName}'.");
+                            CreateMessageBox($"Failed to inject '{library.FileName}'.");
                         return false;
                     }
 
@@ -341,12 +402,12 @@ public partial class MainWindow
                     if (customTargetInjection)
                     {
                         if (!silentFailures)
-                            CreateMessageBox($"💡 Please start '{customTargetProcessName}' and try again.");
+                            CreateMessageBox($"Please start '{customTargetProcessName}' and try again.");
                     }
                     else
                     {
                         if (!silentFailures)
-                            CreateMessageBox("💡 Please close the game & try again.");
+                            CreateMessageBox("Please close the game and try again.");
                     }
                     return false;
                 }
@@ -357,7 +418,7 @@ public partial class MainWindow
                 return true;
             }
 
-            if (!silentFailures && beta && !await DialogBox.ShowAsync("⚠️ Beta Usage", @"The beta build of the client might be potentially unstable. 
+            if (!silentFailures && beta && !await DialogBox.ShowAsync("Beta Usage", @"The beta build of the client might be potentially unstable. 
 
 • Bugs & crashes might occur frequently during gameplay.
 • The beta build is meant for reporting bugs & issues with the client.
@@ -368,7 +429,7 @@ Hence use at your own risk.", ("Cancel", false), ("Launch", true)))
             if (!await client.DownloadAsync(ClientDownloadProgressAction))
             {
                 if (!silentFailures)
-                    await DialogBox.ShowAsync("💡 Update Failed", @"A client update couldn't be downloaded.
+                    await DialogBox.ShowAsync("Update Failed", @"A client update couldn't be downloaded.
 
 • Try closing the game & see if the client updates.
 • Try rebooting your machine & see if that resolves the issue.
@@ -383,7 +444,7 @@ If you need help, join our Discord.", ("OK", true));
             if (!launched)
             {
                 if (!silentFailures)
-                    await DialogBox.ShowAsync("💡 Launch Failure", @"The client couldn't inject correctly.
+                    await DialogBox.ShowAsync("Launch Failure", @"The client couldn't inject correctly.
 
 • Try closing the game & try again.
 • Remove & disable any 3rd party mods or tools.
@@ -404,16 +465,52 @@ If you need help, join our Discord.", ("OK", true));
 
     void PlayStartupSound()
     {
-        const string startupSoundPath = @"D:\diamond261\Downloads\1271923498243325953.ogg";
-
         try
         {
-            if (!File.Exists(startupSoundPath))
+            var soundPath = s_autoVoidSoundCandidates.FirstOrDefault(File.Exists);
+            if (soundPath is null)
                 return;
 
-            _startupSoundPlayer.Open(new Uri(startupSoundPath, UriKind.Absolute));
+            _startupSoundPlayer.Open(new Uri(soundPath, UriKind.Absolute));
             _startupSoundPlayer.Volume = 1.0;
             _startupSoundPlayer.Play();
+        }
+        catch { }
+    }
+
+    void PlayAutoVoidLaunchSound()
+    {
+        try
+        {
+            if (!_autoVoidDisabled)
+                return;
+
+            var soundPath = s_autoVoidSoundCandidates.FirstOrDefault(File.Exists);
+            if (soundPath is null)
+                return;
+
+            if (!_autoVoidSoundReady || !string.Equals(_autoVoidLoadedPath, soundPath, OrdinalIgnoreCase))
+            {
+                _autoVoidSoundReady = false;
+                _autoVoidLoadedPath = soundPath;
+                EventHandler handler = null;
+                handler = (_, _) =>
+                {
+                    _autoVoidSoundPlayer.MediaOpened -= handler;
+                    _autoVoidSoundPlayer.Stop();
+                    _autoVoidSoundPlayer.Position = TimeSpan.Zero;
+                    _autoVoidSoundPlayer.Volume = 1.0;
+                    _autoVoidSoundPlayer.Play();
+                };
+                _autoVoidSoundPlayer.MediaOpened += handler;
+                _autoVoidSoundPlayer.Open(new Uri(soundPath, UriKind.Absolute));
+                return;
+            }
+
+            _autoVoidSoundPlayer.Stop();
+            _autoVoidSoundPlayer.Position = TimeSpan.Zero;
+            _autoVoidSoundPlayer.Volume = 1.0;
+            _autoVoidSoundPlayer.Play();
         }
         catch { }
     }
@@ -441,7 +538,7 @@ If you need help, join our Discord.", ("OK", true));
         if (isDownloadingVersion)
         {
             e.Cancel = true;
-            CreateMessageBox("⚠️ The launcher cannot be closed due a version of Minecraft being downloaded.");
+            CreateMessageBox("The launcher cannot be closed because a Minecraft version is being downloaded.");
         }
     }
 

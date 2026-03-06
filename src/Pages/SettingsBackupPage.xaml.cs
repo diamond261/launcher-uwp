@@ -27,9 +27,14 @@ public partial class SettingsBackupPage : Page
         {
             List<string> backups = await BackupManager.GetAllBackupsAsync();
 
+            _stackPanel.Children.Clear();
+
             foreach (string backup in backups)
             {
-                AddBackupItem(backup, "what?");
+                var displayName = backup.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                    ? System.IO.Path.GetFileNameWithoutExtension(backup)
+                    : backup;
+                AddBackupItem(displayName, backup);
             }
         });
     }

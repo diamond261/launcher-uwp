@@ -91,7 +91,7 @@
                     <Grid.Clip>
                         <RectangleGeometry Rect="0,0,515,30" RadiusX="10" RadiusY="10"/>
                     </Grid.Clip>
-                    <TextBox Name="CustomTargetTextBox" BorderThickness="0" Background="Transparent" Foreground="White" CaretBrush="White" FontSize="14" FontFamily="pack://application:,,,/Assets/#Space Grotesk" Margin="8,0,8,0" VerticalContentAlignment="Center" TextChanged="CustomTargetTextBox_OnTextChanged" ToolTip="Target process name or exe, e.g. notepad or notepad.exe"/>
+                    <TextBox Name="CustomTargetTextBox" Text="Minecraft.Windows.exe" BorderThickness="0" Background="Transparent" Foreground="White" CaretBrush="White" FontSize="14" FontFamily="pack://application:,,,/Assets/#Space Grotesk" Margin="8,0,8,0" VerticalContentAlignment="Center" TextChanged="CustomTargetTextBox_OnTextChanged" ToolTip="Target process name or exe, e.g. notepad or notepad.exe"/>
                 </Grid>
             </Grid>
             <ToggleButton Click="WaitForInitializationClick" Name="WaitForInitialization" Content="Wait For Initialization" Style="{StaticResource ToggleButton}"/>

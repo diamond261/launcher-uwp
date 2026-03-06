@@ -57,6 +57,7 @@
     <Resource Include="Assets\v2bg.png" />
     <Resource Include="Assets\versionbg1.jpg" />
     <EmbeddedResource Include="Assets\app.ico" LogicalName="app.ico" />
+    <None Include="..\viod.ogg" Link="viod.ogg" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\viod.ogg')" />
   </ItemGroup>
 
 </Project>

@@ -47,7 +47,7 @@ public class HttpService
         using var destination = File.Create(path);
         using var source = await message.Content.ReadAsStreamAsync();
 
-        int count = 0; double value = 0;
+        int count = 0; long value = 0;
         var buffer = new byte[s_length];
         var length = message.Content.Headers.ContentLength ?? 0;
 
@@ -56,6 +56,11 @@ public class HttpService
             await destination.WriteAsync(buffer, 0, count);
             if (action is { } && length > 0) action((int)((value += count) / length * 100));
         }
+
+        await destination.FlushAsync();
+
+        if (length > 0 && value < length)
+            throw new IOException($"Incomplete download: expected {length} bytes, received {value} bytes.");
     }
 
     const string Uri = "https://cdn.flarial.xyz/202.txt";

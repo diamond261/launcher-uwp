@@ -20,7 +20,7 @@ public partial class BackupItem : UserControl
 
     private void LoadBackup(object sender, RoutedEventArgs e)
     {
-        Dispatcher.InvokeAsync(async () => await BackupManager.LoadBackup(Time));
+        Dispatcher.InvokeAsync(async () => await BackupManager.LoadBackup(Path));
         Application.Current.Dispatcher.Invoke(() =>
         {
             MainWindow.CreateMessageBox("Loading the backup. This may take some time!");
@@ -58,7 +58,7 @@ public partial class BackupItem : UserControl
 
         (this.VisualParent as VirtualizingStackPanel)?.Children.Remove(this);
 
-        await Dispatcher.InvokeAsync(async () => await BackupManager.DeleteBackup(Time));
+        await Dispatcher.InvokeAsync(async () => await BackupManager.DeleteBackup(Path));
 
     }
 }
