@@ -500,10 +500,8 @@ public sealed class BackupService
         }
 
         var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-        if (isSafetyBackup)
-            return SanitizeFileName($"{platform}_safety_{timestamp}.zip");
-
-        return SanitizeFileName($"{platform}_backup_{timestamp}.zip");
+        var normalizedVersion = string.IsNullOrWhiteSpace(minecraftVersion) ? "unknown" : minecraftVersion.Trim();
+        return SanitizeFileName($"{normalizedVersion}_{timestamp}.zip");
     }
 
     internal static int CopyRequiredEntries(string sourceComMojangPath, string destinationComMojangPath, bool overwriteExisting)
